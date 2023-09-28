@@ -2,6 +2,8 @@ package ru.javarush.satvaldiev.quest.controller;
 
 import java.io.*;
 import java.util.List;
+import java.util.Objects;
+
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.*;
 import jakarta.servlet.annotation.*;
@@ -34,80 +36,127 @@ public class StartServlet extends HttpServlet {
         }
         else playerName = (String) currentSession.getAttribute("playerName");
 
+        if (currentSession.getAttribute("numberOfLoses") == null) {
+            Integer loses = 0;
+            currentSession.setAttribute("numberOfLoses", loses);
+        }
+        if (currentSession.getAttribute("numberOfWins") == null) {
+            Integer wins = 0;
+            currentSession.setAttribute("numberOfWins", wins);
+        }
+        int totalLoses = (int) currentSession.getAttribute("numberOfLoses");
+        int totalWins = (int) currentSession.getAttribute("numberOfWins");
+        int totalGames = totalLoses + totalWins;
         response.setContentType("text/html");
 
         PrintWriter out = response.getWriter();
-        out.println("<html><head>\n" +
+        out.println("<html lang=\"en\"><head>\n<meta charset=\"utf-8\">\n" +
+                "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, shrink-to-fit=no\">" +
                 "  <title>Квесты от Сереги</title>\n" +
                 "  <link href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css\" rel=\"stylesheet\" integrity=\"sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN\" crossorigin=\"anonymous\">\n" +
                 "</head><body>");
-        out.println("<h1>"+ playerName + ", выберите квест из списка:</h1>");
+        out.println("<div class=\"d-flex justify-content-center\"><h2>"+ playerName + ", выберите квест из списка:</h2></div>");
         out.println("<table>");
 
         for (String s : questsList) {
-           long questId = questService.getQuest(s).orElse(null).getQuestId();
-           out.println("<tr><td onclick=\"window.location='/start-servlet?questionId=null&questId=" + questId + "'\">" + s +"</td></tr>");
+           long questId = Objects.requireNonNull(questService.getQuest(s).orElse(null)).getQuestId();
+
+           out.println("<tr><td onclick=\"window.location='/start-servlet?questionId=null&questId=" + questId + "'\"><p class=\"fs-4\">" + questId + ". " + s +"</p></td></tr>");
+
         }
         out.println("</table>");
+        displayStatistics(currentSession, totalLoses, totalWins, totalGames, out);
         out.println("</body></html>");
     }
     public void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-
+        HttpSession currentSession = request.getSession();
+        PrintWriter out = response.getWriter();
+        if (currentSession.getAttribute("numberOfLoses") == null) {
+            Integer loses = 0;
+            currentSession.setAttribute("numberOfLoses", loses);
+        }
+        if (currentSession.getAttribute("numberOfWins") == null) {
+            Integer wins = 0;
+            currentSession.setAttribute("numberOfWins", wins);
+        }
         if  (request.getParameter("questionId").equals("null")) {
-            Long questId = Long.valueOf(request.getParameter("questId"));
+            long questId = Long.parseLong(request.getParameter("questId"));
             Quest quest = questService.getQuestById(questId).orElse(null);
+            assert quest != null;
             String questDescription = quest.getQuestDescription();
             String[] splitQuestDescription = questDescription.split("\n");
             response.setContentType("text/html");
-            PrintWriter out = response.getWriter();
-            out.println("<html><head>\n" +
+            out.println("<html lang=\"en\"><head>\n<meta charset=\"utf-8\">\n" +
+                    "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, shrink-to-fit=no\">" +
                     "  <title>Квесты от Сереги</title>\n" +
                     "  <link href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css\" rel=\"stylesheet\" integrity=\"sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN\" crossorigin=\"anonymous\">\n" +
                     "</head><body>");
-            for (int i = 0; i < splitQuestDescription.length; i++) {
-                if (splitQuestDescription[i].startsWith("<<<")) {
-                    String edited = splitQuestDescription[i].replaceAll("<<<", "");
-                    out.println("<h2>"+ edited + "</h2>");
-                }
-                else out.println("<p>" + splitQuestDescription[i] + "</p>");
+            for (String s : splitQuestDescription) {
+                if (s.startsWith("<<<")) {
+                    String edited = s.replaceAll("<<<", "");
+                    out.println("<div class=\"d-flex justify-content-center\"><h2>" + edited + "</h2></div>");
+                } else out.println("<p class=\"fs-4\">" + s + "</p>");
             }
-            out.println("<table><tr>");
-            out.println("<td><button id=\"button1\" onclick=\"window.location='/start-servlet?questionId=1&questId=" + questId + "'\">Начать</td>");
-            out.println("</tr></table>");
-
+            out.println("<br><div class=\"d-flex justify-content-center\">");
+            out.println("<button type=\"button\" class=\"btn btn-primary\" id=\"button1\" onclick=\"window.location='/start-servlet?questionId=1&questId=" + questId + "'\">Начать</button>");
+            out.println("</div>");
         }
         else {
-            Long questId = Long.valueOf(request.getParameter("questId"));
-            Long questionId = Long.valueOf(request.getParameter("questionId"));
+            long questId = Long.parseLong(request.getParameter("questId"));
+            long questionId = Long.parseLong(request.getParameter("questionId"));
             Question question = questionService.getNextQuestion(questId, questionId).orElse(null);
+            assert question != null;
+            if (question.getWinOrLose().equals("lose")) {
+                Integer numberOfLoses = (Integer) currentSession.getAttribute("numberOfLoses");
+                numberOfLoses += 1;
+                System.out.println(numberOfLoses);
+                currentSession.setAttribute("numberOfLoses", numberOfLoses);
+            }
+            if (question.getWinOrLose().equals("win")) {
+                Integer numberOfWins = (Integer) currentSession.getAttribute("numberOfWins");
+                numberOfWins += 1;
+                currentSession.setAttribute("numberOfWins", numberOfWins);
+            }
             String startMessage = question.getStartMessage();
             String[] splitStartMessage = startMessage.split("\n");
             response.setContentType("text/html");
-
-            PrintWriter out = response.getWriter();
-            out.println("<html><head>\n" +
+            out.println("<html lang=\"en\"><head>\n" +
                     "  <title>Квесты от Сереги</title>\n" +
                     "  <link href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css\" rel=\"stylesheet\" integrity=\"sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN\" crossorigin=\"anonymous\">\n" +
                     "</head><body>");
-            for (int i = 0; i < splitStartMessage.length; i++) {
-                if (splitStartMessage[i].startsWith("<<<")) {
-                    String edited = splitStartMessage[i].replaceAll("<<<", "");
-                    out.println("<h2>"+ edited + "</h2>");
-                }
-                else out.println("<p>"+ splitStartMessage[i] + "</p>");
+            for (String s : splitStartMessage) {
+                if (s.startsWith("<<<")) {
+                    String edited = s.replaceAll("<<<", "");
+                    out.println("<div class=\"d-flex justify-content-center\"><h2>" + edited + "</h2></div>");
+                } else out.println("<p class=\"fs-4\">" + s + "</p>");
             }
             out.println("<table><tr>");
-            out.println("<td><button id=\"button1\" onclick=\"window.location='/start-servlet?questionId=" + question.getNextQuestionIdFirst()+ "&questId=" + questId + "'\">" + question.getFirstChoice() +"</td>");
+            out.println("<td><form><button type=\"button\" class=\"btn btn-primary\" id=\"button1\" onclick=\"window.location='/start-servlet?questionId=" + question.getNextQuestionIdFirst()+ "&questId=" + questId + "'\">" + question.getFirstChoice() +"</button></form></td>");
             if (question.getNextQuestionIdSecond() != 0) {
-                out.println("<td><button id=\"button2\" onclick=\"window.location='/start-servlet?questionId=" + question.getNextQuestionIdSecond()+ "&questId=" + questId + "'\">" + question.getSecondChoice() +"</td>");
+                out.println("<td><form><button type=\"button\" class=\"btn btn-secondary\" id=\"button2\" onclick=\"window.location='/start-servlet?questionId=" + question.getNextQuestionIdSecond()+ "&questId=" + questId + "'\">" + question.getSecondChoice() +"</button></form></td>");
             }
             else {
-                out.println("<td><form action=\"/start-servlet\" method=\"post\"><button name=\"name\">" + question.getSecondChoice() +"</button></form></td>");
+                out.println("<td><form action=\"/start-servlet\" method=\"post\"><button class=\"btn btn-secondary\" name=\"name\">" + question.getSecondChoice() +"</button></form></td>");
             }
             out.println("</tr></table>");
-            out.println("</body></html>");
         }
+        int totalLoses = (int) currentSession.getAttribute("numberOfLoses");
+        int totalWins = (int) currentSession.getAttribute("numberOfWins");
+        int totalGames = totalLoses + totalWins;
+        displayStatistics(currentSession, totalLoses, totalWins, totalGames, out);
+        out.println("</body></html>");
     }
+
+    private void displayStatistics(HttpSession currentSession, int totalLoses, int totalWins, int totalGames, PrintWriter out) {
+        out.println("<br>");
+        out.println("<table class=\"table\"><tr class=\"table-primary\"><td>Статистика:</td><td></td></tr>");
+        out.println("<tr class=\"table-light\"><td>Имя игрока:</td><td>" + currentSession.getAttribute("playerName") + "</td></tr>");
+        out.println("<tr class=\"table-light\"><td>Всего сыграно:</td><td>" + totalGames + "</td></tr>");
+        out.println("<tr class=\"table-success\"><td>Всего побед:</td><td>" + totalWins + "</td></tr>");
+        out.println("<tr class=\"table-danger\"><td>Всего поражений:</td><td>" + totalLoses + "</td></tr></table>");
+
+    }
+
     public void destroy() {
     }
 }
