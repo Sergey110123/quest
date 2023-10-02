@@ -49,6 +49,10 @@ public class QuestionRepository {
     }};
 
     public Optional<Question> getNextQuestion(long questId, long questionId) {
+        if (questId <= 0)
+            throw new IllegalArgumentException("Quest ID cannot be 0 or negative.");
+        if (questionId <= 0)
+            throw new IllegalArgumentException("Question ID cannot be 0 or negative.");
         return questionsStorage.stream().filter(Question -> questId == Question.getQuestId() && questionId == Question.getQuestionId()).findFirst();
     }
 
